@@ -2,6 +2,8 @@ module Main exposing (main)
 
 import Browser
 import Count
+import FormatNumber
+import FormatNumber.Locales exposing (Locale)
 import Html exposing (Html, div, input, label, table, td, text, tr)
 import Html.Attributes as Attr exposing (height, step, type_, value, width)
 import Html.Events exposing (onInput)
@@ -173,7 +175,7 @@ proportionDiagram { noInjNoSur, noInjYesSur, yesInjNoSur, yesInjYesSur } =
                         , fill "rgb(239,41,41)" --lightRed
                         ]
                         []
-                    , Svg.text_ [ x "20", y "20" ] [ Svg.text <| String.fromFloat noInjNoSur_proportion ]
+                    , Svg.text_ [ x "20", y "20" ] [ Svg.text <| formatAsPercent noInjNoSur_proportion ]
                     , Svg.rect
                         [ x "200"
                         , y (String.fromFloat <| 200 - 200 * noInjYesSur_proportion)
@@ -182,7 +184,7 @@ proportionDiagram { noInjNoSur, noInjYesSur, yesInjNoSur, yesInjYesSur } =
                         , fill "rgb(138,226,52)" --lightGreen
                         ]
                         []
-                    , Svg.text_ [ x "220", y "20" ] [ Svg.text <| String.fromFloat noInjYesSur_proportion ]
+                    , Svg.text_ [ x "220", y "20" ] [ Svg.text <| formatAsPercent noInjYesSur_proportion ]
                     , Svg.rect
                         [ x (String.fromFloat <| 200 - 200 * yesInjNoSur_proportion)
                         , y "200"
@@ -191,7 +193,7 @@ proportionDiagram { noInjNoSur, noInjYesSur, yesInjNoSur, yesInjYesSur } =
                         , fill "rgb(114,159,207)" --lightBlue
                         ]
                         []
-                    , Svg.text_ [ x "20", y "220" ] [ Svg.text <| String.fromFloat yesInjNoSur_proportion ]
+                    , Svg.text_ [ x "20", y "220" ] [ Svg.text <| formatAsPercent yesInjNoSur_proportion ]
                     , Svg.rect
                         [ x "200"
                         , y "200"
@@ -200,7 +202,7 @@ proportionDiagram { noInjNoSur, noInjYesSur, yesInjNoSur, yesInjYesSur } =
                         , fill "rgb(252,175,62)" -- lightOrange
                         ]
                         []
-                    , Svg.text_ [ x "220", y "220" ] [ Svg.text <| String.fromFloat yesInjYesSur_proportion ]
+                    , Svg.text_ [ x "220", y "220" ] [ Svg.text <| formatAsPercent yesInjYesSur_proportion ]
                     ]
     in
     Svg.svg [ width 400, height 400 ] [ proportionSquare ]
@@ -220,3 +222,13 @@ slider lbl msg val =
             , text (String.fromInt val)
             ]
         ]
+
+
+formatAsPercent : Float -> String
+formatAsPercent x =
+    FormatNumber.format locale (x * 100) ++ "%"
+
+
+locale : Locale
+locale =
+    Locale 2 "," "." "−" "" "" ""
