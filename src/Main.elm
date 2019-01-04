@@ -1,8 +1,9 @@
 module Main exposing (main)
 
+import Browser
 import Count
 import Html exposing (Html, div, input, label, table, td, text, tr)
-import Html.Attributes as Attr exposing (..)
+import Html.Attributes as Attr exposing (height, step, type_, value, width)
 import Html.Events exposing (onInput)
 import Svg
 import Svg.Attributes exposing (fill, x, y)
@@ -53,10 +54,10 @@ type Msg
     | ChangeCodomain String
 
 
-main : Program Never Model Msg
+main : Program () Model Msg
 main =
-    Html.beginnerProgram
-        { model = init
+    Browser.sandbox
+        { init = init
         , update = update
         , view = view
         }
@@ -75,14 +76,14 @@ update msg model =
         ChangeDomain d ->
             let
                 newDomain =
-                    String.toInt d |> Result.withDefault 0
+                    String.toInt d |> Maybe.withDefault 0
             in
             { model | domain = newDomain }
 
         ChangeCodomain c ->
             let
                 newCodomain =
-                    String.toInt c |> Result.withDefault 0
+                    String.toInt c |> Maybe.withDefault 0
             in
             { model | codomain = newCodomain }
 
@@ -109,7 +110,7 @@ countsTable { noInjNoSur, noInjYesSur, yesInjNoSur, yesInjYesSur } =
             td [] [ text t ]
 
         intCell =
-            textCell << toString
+            textCell << String.fromInt
     in
     table []
         [ tr []
@@ -148,6 +149,7 @@ proportionDiagram { noInjNoSur, noInjYesSur, yesInjNoSur, yesInjYesSur } =
         proportionSquare =
             if noInjNoSur < 0 || noInjYesSur < 0 || yesInjNoSur < 0 || yesInjYesSur < 0 || totalSum == 0 then
                 Svg.text_ [ x "200", y "200" ] [ Svg.text "No data to draw diagram" ]
+
             else
                 let
                     noInjNoSur_proportion =
@@ -164,32 +166,32 @@ proportionDiagram { noInjNoSur, noInjYesSur, yesInjNoSur, yesInjYesSur } =
                 in
                 Svg.g []
                     [ Svg.rect
-                        [ x (toString <| 200 - 200 * noInjNoSur_proportion)
-                        , y (toString <| 200 - 200 * noInjNoSur_proportion)
+                        [ x (String.fromFloat <| 200 - 200 * noInjNoSur_proportion)
+                        , y (String.fromFloat <| 200 - 200 * noInjNoSur_proportion)
                         , width <| round <| 200 * noInjNoSur_proportion
                         , height <| round <| 200 * noInjNoSur_proportion
                         , fill "rgb(239,41,41)" --lightRed
                         ]
                         []
-                    , Svg.text_ [ x "20", y "20" ] [ Svg.text <| toString noInjNoSur_proportion ]
+                    , Svg.text_ [ x "20", y "20" ] [ Svg.text <| String.fromFloat noInjNoSur_proportion ]
                     , Svg.rect
                         [ x "200"
-                        , y (toString <| 200 - 200 * noInjYesSur_proportion)
+                        , y (String.fromFloat <| 200 - 200 * noInjYesSur_proportion)
                         , width <| round <| 200 * noInjYesSur_proportion
                         , height <| round <| 200 * noInjYesSur_proportion
                         , fill "rgb(138,226,52)" --lightGreen
                         ]
                         []
-                    , Svg.text_ [ x "220", y "20" ] [ Svg.text <| toString noInjYesSur_proportion ]
+                    , Svg.text_ [ x "220", y "20" ] [ Svg.text <| String.fromFloat noInjYesSur_proportion ]
                     , Svg.rect
-                        [ x (toString <| 200 - 200 * yesInjNoSur_proportion)
+                        [ x (String.fromFloat <| 200 - 200 * yesInjNoSur_proportion)
                         , y "200"
                         , width <| round <| 200 * yesInjNoSur_proportion
                         , height <| round <| 200 * yesInjNoSur_proportion
                         , fill "rgb(114,159,207)" --lightBlue
                         ]
                         []
-                    , Svg.text_ [ x "20", y "220" ] [ Svg.text <| toString yesInjNoSur_proportion ]
+                    , Svg.text_ [ x "20", y "220" ] [ Svg.text <| String.fromFloat yesInjNoSur_proportion ]
                     , Svg.rect
                         [ x "200"
                         , y "200"
@@ -198,7 +200,7 @@ proportionDiagram { noInjNoSur, noInjYesSur, yesInjNoSur, yesInjYesSur } =
                         , fill "rgb(252,175,62)" -- lightOrange
                         ]
                         []
-                    , Svg.text_ [ x "220", y "220" ] [ Svg.text <| toString yesInjYesSur_proportion ]
+                    , Svg.text_ [ x "220", y "220" ] [ Svg.text <| String.fromFloat yesInjYesSur_proportion ]
                     ]
     in
     Svg.svg [ width 400, height 400 ] [ proportionSquare ]
@@ -214,7 +216,7 @@ slider lbl msg val =
     div []
         [ label []
             [ text lbl
-            , input [ type_ "range", Attr.min "0", Attr.max "10", step "1", onInput msg, value (toString val) ] []
-            , text (toString val)
+            , input [ type_ "range", Attr.min "0", Attr.max "10", step "1", onInput msg, value (String.fromInt val) ] []
+            , text (String.fromInt val)
             ]
         ]
