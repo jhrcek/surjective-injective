@@ -8,10 +8,9 @@ import Element.Events as Events
 import Element.Input as Input
 import FormatNumber
 import FormatNumber.Locales exposing (Locale)
-import FunctionCounts exposing (FunctionCounts)
+import FunctionCounts exposing (FunctionCountsRelative)
 import Html exposing (Html, text)
 import Html.Attributes exposing (height, width)
-import Svg.Attributes exposing (fill)
 
 
 main : Program () Model Msg
@@ -63,17 +62,17 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    let
-        fcounts =
-            FunctionCounts.lookupCounts ( model.domain, model.codomain )
-    in
     Element.layout [] <|
         Element.column []
             [ slider 10 (5 * cellSize) "Domain size" ChangeDomain model.domain
             , slider 10 (5 * cellSize) "Codomain size" ChangeCodomain model.codomain
-            , proportionsTable model
-            , countsTable fcounts
-            , slider 5 75 "Percent precision" ChangePercentPrecision model.percentPrecision
+            , Element.row []
+                [ proportionsTable model
+                , Element.column [ Element.alignTop ]
+                    [ infoTable model
+                    , slider 5 75 "Percent precision" ChangePercentPrecision model.percentPrecision
+                    ]
+                ]
             ]
 
 
@@ -183,31 +182,6 @@ codomainSizeLegendRow =
         |> Element.row []
 
 
-countsTable : FunctionCounts -> Element msg
-countsTable { noInjNoSur, noInjYesSur, yesInjNoSur, yesInjYesSur } =
-    Element.table []
-        { data =
-            [ Rec "No" noInjNoSur yesInjNoSur (noInjNoSur + yesInjNoSur)
-            , Rec "Yes" noInjYesSur yesInjYesSur (noInjYesSur + yesInjYesSur)
-            , Rec "Total" (noInjNoSur + noInjYesSur) (yesInjNoSur + yesInjYesSur) (noInjNoSur + noInjYesSur + yesInjNoSur + yesInjYesSur)
-            ]
-        , columns =
-            [ { header = Element.text "Injective? / Surjective?", width = Element.px 250, view = \{ s } -> Element.text s }
-            , { header = Element.text "No", width = Element.px 150, view = \{ x } -> Element.text <| String.fromInt x }
-            , { header = Element.text "Yes", width = Element.px 100, view = \{ y } -> Element.text <| String.fromInt y }
-            , { header = Element.text "Total", width = Element.px 100, view = \{ z } -> Element.text <| String.fromInt z }
-            ]
-        }
-
-
-type alias Rec =
-    { s : String
-    , x : Int
-    , y : Int
-    , z : Int
-    }
-
-
 slider : Int -> Int -> String -> (Int -> Msg) -> Int -> Element Msg
 slider maxVal w lbl toMsg val =
     Input.slider
@@ -235,3 +209,60 @@ formatAsPercent decimalPrecision x =
 locale : Int -> Locale
 locale decimalPrecision =
     Locale decimalPrecision "," "." "−" "" "" ""
+
+
+infoTable : Model -> Element msg
+infoTable model =
+    let
+        fcounts =
+            FunctionCounts.lookupCounts ( model.domain, model.codomain )
+
+        relCounts =
+            FunctionCounts.toRelative fcounts |> Maybe.withDefault (FunctionCountsRelative 0 0 0 0)
+
+        solidBlackBorder =
+            [ Border.solid, Border.width 1 ]
+
+        cell =
+            Element.el (Element.padding 4 :: solidBlackBorder) << Element.text
+    in
+    Element.table
+        solidBlackBorder
+        { data =
+            [ FunctionInfo "Yes" "Yes" fcounts.yesInjYesSur relCounts.yesInjYesSur
+            , FunctionInfo "Yes" "No" fcounts.yesInjNoSur relCounts.yesInjNoSur
+            , FunctionInfo "No" "Yes" fcounts.noInjYesSur relCounts.noInjYesSur
+            , FunctionInfo "No" "No" fcounts.noInjNoSur relCounts.noInjNoSur
+            , FunctionInfo
+                "?"
+                "?"
+                (fcounts.yesInjYesSur + fcounts.yesInjNoSur + fcounts.noInjYesSur + fcounts.noInjNoSur)
+                (relCounts.yesInjYesSur + relCounts.yesInjNoSur + relCounts.noInjYesSur + relCounts.noInjNoSur)
+            ]
+        , columns =
+            [ { header = cell "Injective?"
+              , width = Element.fill
+              , view = cell << .injInfo
+              }
+            , { header = cell "Surjective?"
+              , width = Element.fill
+              , view = cell << .surInfo
+              }
+            , { header = cell "Absolute count"
+              , width = Element.fill
+              , view = cell << String.fromInt << .absoluteCount
+              }
+            , { header = cell "Relative count"
+              , width = Element.fill
+              , view = cell << formatAsPercent model.percentPrecision << .relativeCount
+              }
+            ]
+        }
+
+
+type alias FunctionInfo =
+    { injInfo : String
+    , surInfo : String
+    , absoluteCount : Int
+    , relativeCount : Float
+    }
