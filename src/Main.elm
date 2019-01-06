@@ -14,11 +14,34 @@ import Svg
 import Svg.Attributes exposing (fill, x, y)
 
 
+main : Program () Model Msg
+main =
+    Browser.sandbox
+        { init = init
+        , update = update
+        , view = view
+        }
+
+
 type alias Model =
     { domain : Int
     , codomain : Int
     , percentPrecision : Int
     }
+
+
+init : Model
+init =
+    { domain = 1
+    , codomain = 1
+    , percentPrecision = 1
+    }
+
+
+type Msg
+    = ChangeDomain Int
+    | ChangeCodomain Int
+    | ChangePercentPrecision Int
 
 
 type alias Proportions =
@@ -29,27 +52,30 @@ type alias Proportions =
     }
 
 
-type Msg
-    = ChangeDomain Int
-    | ChangeCodomain Int
-    | ChangePercentPrecision Int
-
-
-main : Program () Model Msg
-main =
-    Browser.sandbox
-        { init = init
-        , update = update
-        , view = view
-        }
-
-
-init : Model
-init =
-    { domain = 1
-    , codomain = 1
-    , percentPrecision = 1
+type alias ProportionsRelative =
+    { noInjNoSur : Float
+    , noInjYesSur : Float
+    , yesInjNoSur : Float
+    , yesInjYesSur : Float
     }
+
+
+toRelative : Proportions -> Maybe ProportionsRelative
+toRelative { noInjNoSur, noInjYesSur, yesInjNoSur, yesInjYesSur } =
+    let
+        totalSum =
+            noInjNoSur + noInjYesSur + yesInjNoSur + yesInjYesSur
+    in
+    if noInjNoSur < 0 || noInjYesSur < 0 || yesInjNoSur < 0 || yesInjYesSur < 0 || totalSum == 0 then
+        Nothing
+
+    else
+        Just
+            { noInjNoSur = toFloat noInjNoSur / toFloat totalSum
+            , noInjYesSur = toFloat noInjYesSur / toFloat totalSum
+            , yesInjNoSur = toFloat yesInjNoSur / toFloat totalSum
+            , yesInjYesSur = toFloat yesInjYesSur / toFloat totalSum
+            }
 
 
 update : Msg -> Model -> Model
@@ -108,72 +134,57 @@ type alias Rec =
 
 
 proportionDiagram : Proportions -> Int -> Html a
-proportionDiagram { noInjNoSur, noInjYesSur, yesInjNoSur, yesInjYesSur } precision =
+proportionDiagram proportions precision =
     let
-        totalSum =
-            noInjNoSur + noInjYesSur + yesInjNoSur + yesInjYesSur
-
         formatPercent =
             formatAsPercent precision
 
-        proportionSquare =
-            if noInjNoSur < 0 || noInjYesSur < 0 || yesInjNoSur < 0 || yesInjYesSur < 0 || totalSum == 0 then
-                Svg.text_ [ x "200", y "200" ] [ Svg.text "No data to draw diagram" ]
+        proportionsView =
+            case toRelative proportions of
+                Nothing ->
+                    Svg.text_ [ x "100", y "200" ] [ Svg.text "No data to draw diagram" ]
 
-            else
-                let
-                    noInjNoSur_proportion =
-                        toFloat noInjNoSur / toFloat totalSum
-
-                    noInjYesSur_proportion =
-                        toFloat noInjYesSur / toFloat totalSum
-
-                    yesInjNoSur_proportion =
-                        toFloat yesInjNoSur / toFloat totalSum
-
-                    yesInjYesSur_proportion =
-                        toFloat yesInjYesSur / toFloat totalSum
-                in
-                Svg.g []
-                    [ Svg.rect
-                        [ x (String.fromFloat <| 200 - 200 * noInjNoSur_proportion)
-                        , y (String.fromFloat <| 200 - 200 * noInjNoSur_proportion)
-                        , width <| round <| 200 * noInjNoSur_proportion
-                        , height <| round <| 200 * noInjNoSur_proportion
-                        , fill "rgb(239,41,41)" --lightRed
+                Just { noInjNoSur, noInjYesSur, yesInjNoSur, yesInjYesSur } ->
+                    Svg.g []
+                        [ Svg.rect
+                            [ x (String.fromFloat <| 200 - 200 * noInjNoSur)
+                            , y (String.fromFloat <| 200 - 200 * noInjNoSur)
+                            , width <| round <| 200 * noInjNoSur
+                            , height <| round <| 200 * noInjNoSur
+                            , fill "rgb(239,41,41)" --lightRed
+                            ]
+                            []
+                        , Svg.text_ [ x "20", y "20" ] [ Svg.text <| formatPercent noInjNoSur ]
+                        , Svg.rect
+                            [ x "200"
+                            , y (String.fromFloat <| 200 - 200 * noInjYesSur)
+                            , width <| round <| 200 * noInjYesSur
+                            , height <| round <| 200 * noInjYesSur
+                            , fill "rgb(138,226,52)" --lightGreen
+                            ]
+                            []
+                        , Svg.text_ [ x "220", y "20" ] [ Svg.text <| formatPercent noInjYesSur ]
+                        , Svg.rect
+                            [ x (String.fromFloat <| 200 - 200 * yesInjNoSur)
+                            , y "200"
+                            , width <| round <| 200 * yesInjNoSur
+                            , height <| round <| 200 * yesInjNoSur
+                            , fill "rgb(114,159,207)" --lightBlue
+                            ]
+                            []
+                        , Svg.text_ [ x "20", y "220" ] [ Svg.text <| formatPercent yesInjNoSur ]
+                        , Svg.rect
+                            [ x "200"
+                            , y "200"
+                            , width <| round <| 200 * yesInjYesSur
+                            , height <| round <| 200 * yesInjYesSur
+                            , fill "rgb(252,175,62)" -- lightOrange
+                            ]
+                            []
+                        , Svg.text_ [ x "220", y "220" ] [ Svg.text <| formatPercent yesInjYesSur ]
                         ]
-                        []
-                    , Svg.text_ [ x "20", y "20" ] [ Svg.text <| formatPercent noInjNoSur_proportion ]
-                    , Svg.rect
-                        [ x "200"
-                        , y (String.fromFloat <| 200 - 200 * noInjYesSur_proportion)
-                        , width <| round <| 200 * noInjYesSur_proportion
-                        , height <| round <| 200 * noInjYesSur_proportion
-                        , fill "rgb(138,226,52)" --lightGreen
-                        ]
-                        []
-                    , Svg.text_ [ x "220", y "20" ] [ Svg.text <| formatPercent noInjYesSur_proportion ]
-                    , Svg.rect
-                        [ x (String.fromFloat <| 200 - 200 * yesInjNoSur_proportion)
-                        , y "200"
-                        , width <| round <| 200 * yesInjNoSur_proportion
-                        , height <| round <| 200 * yesInjNoSur_proportion
-                        , fill "rgb(114,159,207)" --lightBlue
-                        ]
-                        []
-                    , Svg.text_ [ x "20", y "220" ] [ Svg.text <| formatPercent yesInjNoSur_proportion ]
-                    , Svg.rect
-                        [ x "200"
-                        , y "200"
-                        , width <| round <| 200 * yesInjYesSur_proportion
-                        , height <| round <| 200 * yesInjYesSur_proportion
-                        , fill "rgb(252,175,62)" -- lightOrange
-                        ]
-                        []
-                    , Svg.text_ [ x "220", y "220" ] [ Svg.text <| formatPercent yesInjYesSur_proportion ]
-                    ]
     in
-    Svg.svg [ width 400, height 400 ] [ proportionSquare ]
+    Svg.svg [ width 400, height 400 ] [ proportionsView ]
 
 
 slider : Int -> Int -> String -> (Int -> Msg) -> Int -> Element Msg
