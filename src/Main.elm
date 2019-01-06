@@ -1,7 +1,7 @@
 module Main exposing (main)
 
 import Browser
-import Element exposing (Attribute, Element, px, rgb, rgba)
+import Element exposing (Element, px, rgb, rgba)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Events as Events
@@ -9,8 +9,9 @@ import Element.Input as Input
 import FormatNumber
 import FormatNumber.Locales exposing (Locale)
 import FunctionCounts exposing (FunctionCountsRelative)
-import Html exposing (Html, text)
-import Html.Attributes exposing (height, width)
+import Html exposing (Html)
+import Svg exposing (circle, g, path, rect, svg)
+import Svg.Attributes exposing (cx, cy, d, fill, fillOpacity, height, r, rx, ry, stroke, strokeWidth, transform, width, x, y)
 
 
 main : Program () Model Msg
@@ -68,12 +69,34 @@ view model =
             , slider 10 (5 * cellSize) "Codomain size" ChangeCodomain model.codomain
             , Element.row []
                 [ proportionsTable model
+                , proportionsView model
                 , Element.column [ Element.alignTop ]
                     [ infoTable model
                     , slider 5 75 "Percent precision" ChangePercentPrecision model.percentPrecision
+                    , functionDiagram model
                     ]
                 ]
             ]
+
+
+functionDiagram : Model -> Element msg
+functionDiagram model =
+    let
+        setView setSize =
+            rect [ x "1", y "1", width "60", height (String.fromInt <| 45 * max 1 setSize + 15), rx "30", ry "30", stroke "black", fill "none", strokeWidth "2" ] []
+                :: (List.range 1 setSize
+                        |> List.map (\i -> circle [ cx "30", cy (String.fromInt <| 45 * i - 15), r "15", fill "none", stroke "black", strokeWidth "2" ] [])
+                   )
+
+        domainView =
+            setView model.domain
+
+        codomainView =
+            g [ transform "translate(300,0)" ] <| setView model.codomain
+    in
+    Element.html <|
+        svg [ width "500", height "500" ]
+            (codomainView :: domainView)
 
 
 proportionsTable : Model -> Element Msg
@@ -112,7 +135,7 @@ previewCell rowIdx colIdx isCellSelected =
                 1
 
             else
-                0.3
+                0.5
 
         cellContents =
             case FunctionCounts.toRelative fcounts of
@@ -151,7 +174,7 @@ previewCell rowIdx colIdx isCellSelected =
         cellContents
 
 
-commonCellAttributes : List (Attribute msg)
+commonCellAttributes : List (Element.Attribute msg)
 commonCellAttributes =
     [ Element.width (px cellSize)
     , Element.height (px cellSize)
@@ -225,15 +248,18 @@ infoTable model =
 
         cell =
             Element.el (Element.padding 4 :: solidBlackBorder) << Element.text
+
+        coloredCell color =
+            Element.el (Background.color color :: Element.padding 4 :: solidBlackBorder) << Element.text
     in
     Element.table
         solidBlackBorder
         { data =
-            [ FunctionInfo "Yes" "Yes" fcounts.yesInjYesSur relCounts.yesInjYesSur
-            , FunctionInfo "Yes" "No" fcounts.yesInjNoSur relCounts.yesInjNoSur
-            , FunctionInfo "No" "Yes" fcounts.noInjYesSur relCounts.noInjYesSur
-            , FunctionInfo "No" "No" fcounts.noInjNoSur relCounts.noInjNoSur
-            , FunctionInfo
+            [ FunctionInfo (rgba 0 1 0 0.5) "Yes" "Yes" fcounts.yesInjYesSur relCounts.yesInjYesSur
+            , FunctionInfo (rgba 0 0 1 0.5) "Yes" "No" fcounts.yesInjNoSur relCounts.yesInjNoSur
+            , FunctionInfo (rgba 1 0 0 0.5) "No" "Yes" fcounts.noInjYesSur relCounts.noInjYesSur
+            , FunctionInfo (rgba 0.5 0.5 0.5 0.5) "No" "No" fcounts.noInjNoSur relCounts.noInjNoSur
+            , FunctionInfo (rgba 0 0 0 0)
                 "?"
                 "?"
                 (fcounts.yesInjYesSur + fcounts.yesInjNoSur + fcounts.noInjYesSur + fcounts.noInjNoSur)
@@ -242,27 +268,95 @@ infoTable model =
         , columns =
             [ { header = cell "Injective?"
               , width = Element.fill
-              , view = cell << .injInfo
+              , view = \fi -> coloredCell fi.color fi.injInfo
               }
             , { header = cell "Surjective?"
               , width = Element.fill
-              , view = cell << .surInfo
+              , view = \fi -> coloredCell fi.color fi.surInfo
               }
             , { header = cell "Absolute count"
               , width = Element.fill
-              , view = cell << String.fromInt << .absoluteCount
+              , view = \fi -> coloredCell fi.color (String.fromInt fi.absoluteCount)
               }
             , { header = cell "Relative count"
               , width = Element.fill
-              , view = cell << formatAsPercent model.percentPrecision << .relativeCount
+              , view = \fi -> coloredCell fi.color (formatAsPercent model.percentPrecision <| fi.relativeCount)
               }
             ]
         }
 
 
 type alias FunctionInfo =
-    { injInfo : String
+    { color : Element.Color
+    , injInfo : String
     , surInfo : String
     , absoluteCount : Int
     , relativeCount : Float
     }
+
+
+proportionsView : Model -> Element msg
+proportionsView model =
+    let
+        adapterWidth =
+            150
+
+        viewAdapter relCounts =
+            let
+                svgHeight =
+                    toFloat (12 * cellSize)
+
+                -- Relative height of each color
+                greenHeight =
+                    svgHeight * relCounts.yesInjYesSur
+
+                blueHeight =
+                    svgHeight * relCounts.yesInjNoSur
+
+                redHeight =
+                    svgHeight * relCounts.noInjYesSur
+
+                grayHeight =
+                    svgHeight * relCounts.noInjNoSur
+
+                -- Cumulative height
+                greenEnd =
+                    greenHeight
+
+                blueEnd =
+                    greenEnd + blueHeight
+
+                redEnd =
+                    blueEnd + redHeight
+
+                grayEnd =
+                    redEnd + grayHeight
+            in
+            svg
+                [ width <| String.fromInt adapterWidth
+                , height <| String.fromFloat svgHeight
+                ]
+                [ -- Green = bijective
+                  rect [ x "0", y "0", height (String.fromFloat greenHeight), fill "lime", width "48" ] []
+                , path [ d <| "M 50 0  L 150 30  v 30 L 50 " ++ String.fromFloat greenEnd ++ "Z", fill "lime", fillOpacity "0.5" ] []
+
+                -- Blue = injective, not surjective
+                , rect [ x "0", y (String.fromFloat greenEnd), height (String.fromFloat blueHeight), fill "blue", width "48" ] []
+                , path [ d <| "M 50 " ++ String.fromFloat greenEnd ++ "  L 150 60  v 30 L 50 " ++ String.fromFloat blueEnd ++ "Z", fill "blue", fillOpacity "0.5" ] []
+
+                -- Red = surjective, not injective
+                , rect [ x "0", y (String.fromFloat blueEnd), height (String.fromFloat redHeight), fill "red", width "48" ] []
+                , path [ d <| "M 50 " ++ String.fromFloat blueEnd ++ "  L 150 90  v 30 L 50 " ++ String.fromFloat redEnd ++ "Z", fill "red", fillOpacity "0.5" ] []
+
+                -- Gray = Not surjective, not injective
+                , rect [ x "0", y (String.fromFloat redEnd), height (String.fromFloat grayHeight), fill "gray", width "48" ] []
+                , path [ d <| "M 50 " ++ String.fromFloat redEnd ++ "  L 150 120  v 30 L 50 " ++ String.fromFloat grayEnd ++ "Z", fill "grey", fillOpacity "0.5" ] []
+                ]
+
+        emptyView =
+            Element.el [ Element.width (px adapterWidth) ] <| Element.text "No functions"
+    in
+    FunctionCounts.lookupCounts ( model.domain, model.codomain )
+        |> FunctionCounts.toRelative
+        |> Maybe.map (viewAdapter >> Element.html)
+        |> Maybe.withDefault emptyView
