@@ -116,18 +116,23 @@ view model =
                     [ infoTable model.setSizes model.percentPrecision
                     , slider 5 75 "Percent precision" ChangePercentPrecision model.percentPrecision
                     , maybeFunctionDiagram model.setSizes model.exampleFunction
-                    , randomFunctionGeneratorControls
+                    , randomFunctionGeneratorControls model.setSizes
                     ]
                 ]
             ]
 
 
-randomFunctionGeneratorControls : Element Msg
-randomFunctionGeneratorControls =
-    Input.button []
-        { onPress = Just GenerateRandomFunction
-        , label = Element.text "Generate"
-        }
+randomFunctionGeneratorControls : SetSizes -> Element Msg
+randomFunctionGeneratorControls { domain, codomain } =
+    if domain == 0 || codomain == 0 || codomain == 1 then
+        {- When there's no function or just one function, there's nothing to generate -}
+        Element.none
+
+    else
+        Input.button []
+            { onPress = Just GenerateRandomFunction
+            , label = Element.text "Generate"
+            }
 
 
 maybeFunctionDiagram : SetSizes -> Maybe Function -> Element msg

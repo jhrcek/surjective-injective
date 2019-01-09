@@ -12,4 +12,3 @@ Live [demo](https://janhrcek.cz/surjective-injective).
     -   generate any function
     -   surjective, injective (only enabled when such a function exists for given domain/codomain size)
 -   add explanation about why given function is NOT surjective / injective
--   don't show generate button when there are no functions / just one function for given domain/codomain size
