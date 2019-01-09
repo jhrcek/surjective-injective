@@ -12,7 +12,7 @@ import Function exposing (Function, FunctionCountsRelative, SetSizes, eval, rand
 import Html exposing (Html)
 import Random
 import Svg exposing (Svg, circle, g, line, path, rect, svg, text, text_)
-import Svg.Attributes exposing (alignmentBaseline, cx, cy, d, fill, fillOpacity, height, r, rx, ry, stroke, strokeWidth, textAnchor, transform, width, x, x1, x2, y, y1, y2)
+import Svg.Attributes as SA exposing (alignmentBaseline, cx, cy, d, fill, fillOpacity, height, markerEnd, markerHeight, markerUnits, markerWidth, orient, r, refX, refY, rx, ry, stroke, strokeWidth, textAnchor, transform, width, x, x1, x2, y, y1, y2)
 
 
 main : Program () Model Msg
@@ -171,11 +171,22 @@ functionDiagram setSizes f =
             g [ transform "translate(300,0)" ] <| setView setSizes.codomain
 
         mappingLines =
-            g [] <| List.map (\( x, y ) -> line [ x1 "30", x2 "330", y1 (circleYCoord x), y2 (circleYCoord y), stroke "black", strokeWidth "2" ] []) <| Function.eval f
+            g [] <| List.map (\( x, y ) -> line [ x1 "30", x2 "330", y1 (circleYCoord x), y2 (circleYCoord y), stroke "black", strokeWidth "2", markerEnd "url(#arrow)" ] []) <| Function.eval f
     in
     Element.html <|
         svg [ width "400", height "485" ]
-            (mappingLines :: codomainView :: domainView)
+            (arrowHeadMarkerDef :: mappingLines :: codomainView :: domainView)
+
+
+{-| Arrowhead to be reused by all mapping arrows, inspired by <http://vanseodesign.com/web-design/svg-markers/>
+-}
+arrowHeadMarkerDef : Svg a
+arrowHeadMarkerDef =
+    Svg.defs []
+        [ Svg.marker [ SA.id "arrow", markerWidth "10", markerHeight "6", refX "17", refY "3", orient "auto", markerUnits "strokeWidth" ]
+            [ Svg.path [ d "M0 0 V6 L10 3Z", fill "black" ] []
+            ]
+        ]
 
 
 proportionsTable : SetSizes -> Element Msg
