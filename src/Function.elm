@@ -1,11 +1,25 @@
-module FunctionCounts exposing
-    ( FunctionCounts
+module Function exposing
+    ( Function
+    , FunctionCounts
     , FunctionCountsRelative
+    , SetSizes
+    , eval
+    , identityFunction
     , lookupCounts
-    , toRelative
+    , randomFunctionGen
+    , toRelativeCounts
     )
 
+import Array exposing (Array)
 import Dict exposing (Dict)
+import Random exposing (Generator)
+import Random.Array
+
+
+type alias SetSizes =
+    { domain : Int
+    , codomain : Int
+    }
 
 
 type alias FunctionCounts =
@@ -24,8 +38,8 @@ type alias FunctionCountsRelative =
     }
 
 
-toRelative : FunctionCounts -> Maybe FunctionCountsRelative
-toRelative { noInjNoSur, noInjYesSur, yesInjNoSur, yesInjYesSur } =
+toRelativeCounts : FunctionCounts -> Maybe FunctionCountsRelative
+toRelativeCounts { noInjNoSur, noInjYesSur, yesInjNoSur, yesInjYesSur } =
     let
         totalSum =
             noInjNoSur + noInjYesSur + yesInjNoSur + yesInjYesSur
@@ -42,9 +56,33 @@ toRelative { noInjNoSur, noInjYesSur, yesInjNoSur, yesInjYesSur } =
             }
 
 
-lookupCounts : ( Int, Int ) -> FunctionCounts
-lookupCounts ( domainSize, codomainSize ) =
-    Dict.get ( domainSize, codomainSize ) countsDict
+type Function
+    = Function (Array Int)
+
+
+
+--| TODO shouldn't generate anything if function of given type doesn't exist
+
+
+randomFunctionGen : SetSizes -> Generator Function
+randomFunctionGen setSizes =
+    Random.Array.array setSizes.domain (Random.int 0 setSizes.codomain)
+        |> Random.map Function
+
+
+eval : Function -> List ( Int, Int )
+eval (Function f) =
+    Array.toIndexedList f
+
+
+identityFunction : Int -> Function
+identityFunction n =
+    Function (Array.repeat n 0)
+
+
+lookupCounts : SetSizes -> FunctionCounts
+lookupCounts setSizes =
+    Dict.get ( setSizes.domain, setSizes.codomain ) countsDict
         |> Maybe.withDefault (FunctionCounts 0 0 0 0)
 
 

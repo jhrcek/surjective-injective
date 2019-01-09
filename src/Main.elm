@@ -8,79 +8,126 @@ import Element.Events as Events
 import Element.Input as Input
 import FormatNumber
 import FormatNumber.Locales exposing (Locale)
-import FunctionCounts exposing (FunctionCountsRelative)
+import Function exposing (Function, FunctionCountsRelative, SetSizes, eval, randomFunctionGen)
 import Html exposing (Html)
-import Svg exposing (circle, g, path, rect, svg)
+import Random
+import Svg exposing (Svg, circle, g, path, rect, svg)
 import Svg.Attributes exposing (cx, cy, d, fill, fillOpacity, height, r, rx, ry, stroke, strokeWidth, transform, width, x, y)
 
 
 main : Program () Model Msg
 main =
-    Browser.sandbox
+    Browser.element
         { init = init
         , update = update
         , view = view
+        , subscriptions = always Sub.none
         }
 
 
 type alias Model =
-    { domain : Int
-    , codomain : Int
+    { setSizes : SetSizes
     , percentPrecision : Int
+    , randomFunction : Function
     }
 
 
-init : Model
-init =
-    { domain = 1
-    , codomain = 1
-    , percentPrecision = 1
-    }
+init : () -> ( Model, Cmd Msg )
+init _ =
+    ( { setSizes =
+            { domain = 1
+            , codomain = 1
+            }
+      , percentPrecision = 1
+      , randomFunction = Function.identityFunction 1
+      }
+    , Cmd.none
+    )
 
 
 type Msg
     = ChangeDomain Int
     | ChangeCodomain Int
-    | ChangeDomainAndCodomain Int Int
+    | ChangeDomainAndCodomain SetSizes
     | ChangePercentPrecision Int
+    | GenerateRandomFunction
+    | ReceivedRandomFunction Function
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        ChangeDomain newDomain ->
-            { model | domain = newDomain }
+        ChangeDomain domain ->
+            ( { model
+                | setSizes =
+                    { domain = domain
+                    , codomain = model.setSizes.codomain
+                    }
+              }
+            , Cmd.none
+            )
 
-        ChangeCodomain newCodomain ->
-            { model | codomain = newCodomain }
+        ChangeCodomain codomain ->
+            ( { model
+                | setSizes =
+                    { domain = model.setSizes.domain
+                    , codomain = codomain
+                    }
+              }
+            , Cmd.none
+            )
 
-        ChangePercentPrecision newPrecision ->
-            { model | percentPrecision = clamp 0 10 newPrecision }
+        ChangePercentPrecision percentPrecision ->
+            ( { model | percentPrecision = clamp 0 10 percentPrecision }
+            , Cmd.none
+            )
 
-        ChangeDomainAndCodomain newDomain newCodomain ->
-            { model | domain = newDomain, codomain = newCodomain }
+        ChangeDomainAndCodomain setSizes ->
+            ( { model | setSizes = setSizes }, Cmd.none )
+
+        GenerateRandomFunction ->
+            ( model
+            , Random.generate ReceivedRandomFunction
+                (randomFunctionGen model.setSizes)
+            )
+
+        ReceivedRandomFunction randomFunction ->
+            let
+                _ =
+                    Debug.log "random fun" model.randomFunction
+            in
+            ( { model | randomFunction = randomFunction }, Cmd.none )
 
 
 view : Model -> Html Msg
 view model =
     Element.layout [] <|
         Element.column []
-            [ slider 10 (5 * cellSize) "Domain size" ChangeDomain model.domain
-            , slider 10 (5 * cellSize) "Codomain size" ChangeCodomain model.codomain
+            [ slider 10 (5 * cellSize) "Domain size" ChangeDomain model.setSizes.domain
+            , slider 10 (5 * cellSize) "Codomain size" ChangeCodomain model.setSizes.codomain
             , Element.row []
-                [ proportionsTable model
-                , proportionsView model
+                [ proportionsTable model.setSizes
+                , proportionsView model.setSizes
                 , Element.column [ Element.alignTop ]
-                    [ infoTable model
+                    [ infoTable model.setSizes model.percentPrecision
                     , slider 5 75 "Percent precision" ChangePercentPrecision model.percentPrecision
-                    , functionDiagram model
+                    , functionDiagram model.setSizes
+                    , randomFunctionGeneratorControls
                     ]
                 ]
             ]
 
 
-functionDiagram : Model -> Element msg
-functionDiagram model =
+randomFunctionGeneratorControls : Element Msg
+randomFunctionGeneratorControls =
+    Input.button []
+        { onPress = Just GenerateRandomFunction
+        , label = Element.text "Generate"
+        }
+
+
+functionDiagram : SetSizes -> Element msg
+functionDiagram setSizes =
     let
         setView setSize =
             rect [ x "1", y "1", width "60", height (String.fromInt <| 45 * max 1 setSize + 15), rx "30", ry "30", stroke "black", fill "none", strokeWidth "2" ] []
@@ -89,18 +136,18 @@ functionDiagram model =
                    )
 
         domainView =
-            setView model.domain
+            setView setSizes.domain
 
         codomainView =
-            g [ transform "translate(300,0)" ] <| setView model.codomain
+            g [ transform "translate(300,0)" ] <| setView setSizes.codomain
     in
     Element.html <|
         svg [ width "500", height "500" ]
             (codomainView :: domainView)
 
 
-proportionsTable : Model -> Element Msg
-proportionsTable model =
+proportionsTable : SetSizes -> Element Msg
+proportionsTable setSizes =
     codomainSizeLegendRow
         :: List.map
             (\rowIdx ->
@@ -109,9 +156,9 @@ proportionsTable model =
                         (\colIdx ->
                             let
                                 isCellSelected =
-                                    model.domain == rowIdx && model.codomain == colIdx
+                                    setSizes.domain == rowIdx && setSizes.codomain == colIdx
                             in
-                            previewCell rowIdx colIdx isCellSelected
+                            previewCell { domain = rowIdx, codomain = colIdx } isCellSelected
                         )
                         (List.range 0 10)
                     |> Element.row []
@@ -124,11 +171,11 @@ proportionsTable model =
             ]
 
 
-previewCell : Int -> Int -> Bool -> Element Msg
-previewCell rowIdx colIdx isCellSelected =
+previewCell : SetSizes -> Bool -> Element Msg
+previewCell setSizes isCellSelected =
     let
         fcounts =
-            FunctionCounts.lookupCounts ( rowIdx, colIdx )
+            Function.lookupCounts setSizes
 
         alpha =
             if isCellSelected then
@@ -138,7 +185,7 @@ previewCell rowIdx colIdx isCellSelected =
                 0.5
 
         cellContents =
-            case FunctionCounts.toRelative fcounts of
+            case Function.toRelativeCounts fcounts of
                 Nothing ->
                     [ Element.el [ Element.centerX, Element.centerY ] (Element.text "None") ]
 
@@ -170,7 +217,7 @@ previewCell rowIdx colIdx isCellSelected =
                     ]
     in
     Element.column
-        (Events.onClick (ChangeDomainAndCodomain rowIdx colIdx) :: commonCellAttributes)
+        (Events.onClick (ChangeDomainAndCodomain setSizes) :: commonCellAttributes)
         cellContents
 
 
@@ -182,11 +229,6 @@ commonCellAttributes =
     , Border.solid
     , Border.width 1
     ]
-
-
-cellSize : Int
-cellSize =
-    60
 
 
 numberCell : Int -> Element msg
@@ -234,14 +276,14 @@ locale decimalPrecision =
     Locale decimalPrecision "," "." "−" "" "" ""
 
 
-infoTable : Model -> Element msg
-infoTable model =
+infoTable : SetSizes -> Int -> Element msg
+infoTable setSizes percentPrecision =
     let
         fcounts =
-            FunctionCounts.lookupCounts ( model.domain, model.codomain )
+            Function.lookupCounts setSizes
 
         relCounts =
-            FunctionCounts.toRelative fcounts |> Maybe.withDefault (FunctionCountsRelative 0 0 0 0)
+            Function.toRelativeCounts fcounts |> Maybe.withDefault (FunctionCountsRelative 0 0 0 0)
 
         solidBlackBorder =
             [ Border.solid, Border.width 1 ]
@@ -280,7 +322,7 @@ infoTable model =
               }
             , { header = cell "Relative count"
               , width = Element.fill
-              , view = \fi -> coloredCell fi.color (formatAsPercent model.percentPrecision <| fi.relativeCount)
+              , view = \fi -> coloredCell fi.color (formatAsPercent percentPrecision <| fi.relativeCount)
               }
             ]
         }
@@ -295,68 +337,81 @@ type alias FunctionInfo =
     }
 
 
-proportionsView : Model -> Element msg
-proportionsView model =
+proportionsView : SetSizes -> Element msg
+proportionsView setSizes =
     let
-        adapterWidth =
-            150
-
-        viewAdapter relCounts =
-            let
-                svgHeight =
-                    toFloat (12 * cellSize)
-
-                -- Relative height of each color
-                greenHeight =
-                    svgHeight * relCounts.yesInjYesSur
-
-                blueHeight =
-                    svgHeight * relCounts.yesInjNoSur
-
-                redHeight =
-                    svgHeight * relCounts.noInjYesSur
-
-                grayHeight =
-                    svgHeight * relCounts.noInjNoSur
-
-                -- Cumulative height
-                greenEnd =
-                    greenHeight
-
-                blueEnd =
-                    greenEnd + blueHeight
-
-                redEnd =
-                    blueEnd + redHeight
-
-                grayEnd =
-                    redEnd + grayHeight
-            in
-            svg
-                [ width <| String.fromInt adapterWidth
-                , height <| String.fromFloat svgHeight
-                ]
-                [ -- Green = bijective
-                  rect [ x "0", y "0", height (String.fromFloat greenHeight), fill "lime", width "48" ] []
-                , path [ d <| "M 50 0  L 150 30  v 30 L 50 " ++ String.fromFloat greenEnd ++ "Z", fill "lime", fillOpacity "0.5" ] []
-
-                -- Blue = injective, not surjective
-                , rect [ x "0", y (String.fromFloat greenEnd), height (String.fromFloat blueHeight), fill "blue", width "48" ] []
-                , path [ d <| "M 50 " ++ String.fromFloat greenEnd ++ "  L 150 60  v 30 L 50 " ++ String.fromFloat blueEnd ++ "Z", fill "blue", fillOpacity "0.5" ] []
-
-                -- Red = surjective, not injective
-                , rect [ x "0", y (String.fromFloat blueEnd), height (String.fromFloat redHeight), fill "red", width "48" ] []
-                , path [ d <| "M 50 " ++ String.fromFloat blueEnd ++ "  L 150 90  v 30 L 50 " ++ String.fromFloat redEnd ++ "Z", fill "red", fillOpacity "0.5" ] []
-
-                -- Gray = Not surjective, not injective
-                , rect [ x "0", y (String.fromFloat redEnd), height (String.fromFloat grayHeight), fill "gray", width "48" ] []
-                , path [ d <| "M 50 " ++ String.fromFloat redEnd ++ "  L 150 120  v 30 L 50 " ++ String.fromFloat grayEnd ++ "Z", fill "grey", fillOpacity "0.5" ] []
-                ]
-
         emptyView =
-            Element.el [ Element.width (px adapterWidth) ] <| Element.text "No functions"
+            Element.el [ Element.width (px mappingImageWidth) ] <| Element.text "No functions"
     in
-    FunctionCounts.lookupCounts ( model.domain, model.codomain )
-        |> FunctionCounts.toRelative
-        |> Maybe.map (viewAdapter >> Element.html)
+    Function.lookupCounts setSizes
+        |> Function.toRelativeCounts
+        |> Maybe.map (proportionsToTableMapping >> Element.html)
         |> Maybe.withDefault emptyView
+
+
+proportionsToTableMapping : FunctionCountsRelative -> Svg msg
+proportionsToTableMapping relCounts =
+    let
+        svgHeight =
+            toFloat (12 * cellSize)
+
+        -- Relative height of each color
+        greenHeight =
+            svgHeight * relCounts.yesInjYesSur
+
+        blueHeight =
+            svgHeight * relCounts.yesInjNoSur
+
+        redHeight =
+            svgHeight * relCounts.noInjYesSur
+
+        grayHeight =
+            svgHeight * relCounts.noInjNoSur
+
+        -- Cumulative height
+        greenEnd =
+            greenHeight
+
+        blueEnd =
+            greenEnd + blueHeight
+
+        redEnd =
+            blueEnd + redHeight
+
+        grayEnd =
+            redEnd + grayHeight
+    in
+    svg
+        [ width <| String.fromInt mappingImageWidth
+        , height <| String.fromFloat svgHeight
+        ]
+        [ -- Green = bijective
+          rect [ x "0", y "0", height (String.fromFloat greenHeight), fill "lime", width "48" ] []
+        , path [ d <| "M 50 0  L 150 30  v 30 L 50 " ++ String.fromFloat greenEnd ++ "Z", fill "lime", fillOpacity "0.5" ] []
+
+        -- Blue = injective, not surjective
+        , rect [ x "0", y (String.fromFloat greenEnd), height (String.fromFloat blueHeight), fill "blue", width "48" ] []
+        , path [ d <| "M 50 " ++ String.fromFloat greenEnd ++ "  L 150 60  v 30 L 50 " ++ String.fromFloat blueEnd ++ "Z", fill "blue", fillOpacity "0.5" ] []
+
+        -- Red = surjective, not injective
+        , rect [ x "0", y (String.fromFloat blueEnd), height (String.fromFloat redHeight), fill "red", width "48" ] []
+        , path [ d <| "M 50 " ++ String.fromFloat blueEnd ++ "  L 150 90  v 30 L 50 " ++ String.fromFloat redEnd ++ "Z", fill "red", fillOpacity "0.5" ] []
+
+        -- Gray = Not surjective, not injective
+        , rect [ x "0", y (String.fromFloat redEnd), height (String.fromFloat grayHeight), fill "gray", width "48" ] []
+        , path [ d <| "M 50 " ++ String.fromFloat redEnd ++ "  L 150 120  v 30 L 50 " ++ String.fromFloat grayEnd ++ "Z", fill "grey", fillOpacity "0.5" ] []
+        ]
+
+
+{-| Size of cell in the Proportions table
+-}
+cellSize : Int
+cellSize =
+    60
+
+
+{-| Width of the svg image mapping proportions stacked bar to the info table
+-}
+mappingImageWidth : Int
+mappingImageWidth =
+    150
