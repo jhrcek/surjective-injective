@@ -8,7 +8,6 @@ Live [demo](https://janhrcek.cz/surjective-injective).
 
 -   function diagram
     -   Add A, B as set labels
-    -   add 1.. as element labels
     -   add arrowheads
 -   controls for generating random functions
     -   generate any function

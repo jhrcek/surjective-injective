@@ -11,8 +11,8 @@ import FormatNumber.Locales exposing (Locale)
 import Function exposing (Function, FunctionCountsRelative, SetSizes, eval, randomFunctionGen)
 import Html exposing (Html)
 import Random
-import Svg exposing (Svg, circle, g, line, path, rect, svg)
-import Svg.Attributes exposing (cx, cy, d, fill, fillOpacity, height, r, rx, ry, stroke, strokeWidth, transform, width, x, x1, x2, y, y1, y2)
+import Svg exposing (Svg, circle, g, line, path, rect, svg, text, text_)
+import Svg.Attributes exposing (alignmentBaseline, cx, cy, d, fill, fillOpacity, height, r, rx, ry, stroke, strokeWidth, textAnchor, transform, width, x, x1, x2, y, y1, y2)
 
 
 main : Program () Model Msg
@@ -141,7 +141,7 @@ maybeFunctionDiagram setSizes maybeFunction =
 
         Nothing ->
             Element.paragraph []
-                [ Element.text <| "There are no functions from " ++ String.fromInt setSizes.domain ++ " element set to the empty set."
+                [ Element.text <| "There are no functions from " ++ String.fromInt setSizes.domain ++ " element set to the empty set. "
                 , Element.text "Each element from the domain has to map to exactly one element of the codomain, but the codomain is empty."
                 ]
 
@@ -152,7 +152,13 @@ functionDiagram setSizes f =
         setView setSize =
             rect [ x "1", y "1", width "60", height (String.fromInt <| 45 * max 1 setSize + 15), rx "30", ry "30", stroke "black", fill "none", strokeWidth "2" ] []
                 :: (List.range 1 setSize
-                        |> List.map (\i -> circle [ cx "30", cy (circleYCoord i), r "15", fill "white", stroke "black", strokeWidth "2" ] [])
+                        |> List.map
+                            (\i ->
+                                g []
+                                    [ circle [ cx "30", cy (circleYCoord i), r "15", fill "white", stroke "black", strokeWidth "2" ] []
+                                    , text_ [ x "30", y (circleYCoord i), textAnchor "middle", alignmentBaseline "middle" ] [ text <| String.fromInt i ]
+                                    ]
+                            )
                    )
 
         circleYCoord idx =
