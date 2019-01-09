@@ -28,7 +28,7 @@ main =
 type alias Model =
     { setSizes : SetSizes
     , percentPrecision : Int
-    , randomFunction : Function
+    , exampleFunction : Maybe Function
     }
 
 
@@ -39,7 +39,7 @@ init _ =
             , codomain = 1
             }
       , percentPrecision = 1
-      , randomFunction = Function.identityFunction 1
+      , exampleFunction = Just (Function.identityFunction 1)
       }
     , Cmd.none
     )
@@ -51,7 +51,7 @@ type Msg
     | ChangeDomainAndCodomain SetSizes
     | ChangePercentPrecision Int
     | GenerateRandomFunction
-    | ReceivedRandomFunction Function
+    | ReceivedRandomFunction (Maybe Function)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -59,13 +59,13 @@ update msg model =
     case msg of
         ChangeDomain domain ->
             let
-                newSetSize =
+                newSetSizes =
                     { domain = domain
                     , codomain = model.setSizes.codomain
                     }
             in
-            ( { model | setSizes = newSetSize }
-            , generateRandomFunction model.setSizes
+            ( { model | setSizes = newSetSizes }
+            , generateRandomFunction newSetSizes
             )
 
         ChangeCodomain codomain ->
@@ -79,14 +79,14 @@ update msg model =
             , generateRandomFunction newSetSizes
             )
 
-        ChangePercentPrecision percentPrecision ->
-            ( { model | percentPrecision = clamp 0 10 percentPrecision }
-            , Cmd.none
-            )
-
         ChangeDomainAndCodomain setSizes ->
             ( { model | setSizes = setSizes }
             , generateRandomFunction setSizes
+            )
+
+        ChangePercentPrecision percentPrecision ->
+            ( { model | percentPrecision = clamp 0 10 percentPrecision }
+            , Cmd.none
             )
 
         GenerateRandomFunction ->
@@ -94,8 +94,8 @@ update msg model =
             , generateRandomFunction model.setSizes
             )
 
-        ReceivedRandomFunction randomFunction ->
-            ( { model | randomFunction = randomFunction }, Cmd.none )
+        ReceivedRandomFunction maybeRandomFunction ->
+            ( { model | exampleFunction = maybeRandomFunction }, Cmd.none )
 
 
 generateRandomFunction : SetSizes -> Cmd Msg
@@ -115,7 +115,7 @@ view model =
                 , Element.column [ Element.alignTop ]
                     [ infoTable model.setSizes model.percentPrecision
                     , slider 5 75 "Percent precision" ChangePercentPrecision model.percentPrecision
-                    , functionDiagram model.setSizes model.randomFunction
+                    , maybeFunctionDiagram model.setSizes model.exampleFunction
                     , randomFunctionGeneratorControls
                     ]
                 ]
@@ -128,6 +128,22 @@ randomFunctionGeneratorControls =
         { onPress = Just GenerateRandomFunction
         , label = Element.text "Generate"
         }
+
+
+maybeFunctionDiagram : SetSizes -> Maybe Function -> Element msg
+maybeFunctionDiagram setSizes maybeFunction =
+    case maybeFunction of
+        Just function ->
+            Element.column []
+                [ Element.text "Example"
+                , functionDiagram setSizes function
+                ]
+
+        Nothing ->
+            Element.paragraph []
+                [ Element.text <| "There are no functions from " ++ String.fromInt setSizes.domain ++ " element set to the empty set."
+                , Element.text "Each element from the domain has to map to exactly one element of the codomain, but the codomain is empty."
+                ]
 
 
 functionDiagram : SetSizes -> Function -> Element msg
@@ -152,7 +168,7 @@ functionDiagram setSizes f =
             g [] <| List.map (\( x, y ) -> line [ x1 "30", x2 "330", y1 (circleYCoord x), y2 (circleYCoord y), stroke "black", strokeWidth "2" ] []) <| Function.eval f
     in
     Element.html <|
-        svg [ width "500", height "500" ]
+        svg [ width "400", height "485" ]
             (mappingLines :: codomainView :: domainView)
 
 

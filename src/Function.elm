@@ -62,14 +62,14 @@ type Function
     = Function (Array Int)
 
 
-
---| TODO shouldn't generate anything if function of given type doesn't exist
-
-
-randomFunctionGen : SetSizes -> Generator Function
+randomFunctionGen : SetSizes -> Generator (Maybe Function)
 randomFunctionGen setSizes =
-    Random.Array.array setSizes.domain (Random.int 1 setSizes.codomain)
-        |> Random.map Function
+    if setSizes.domain /= 0 && setSizes.codomain == 0 then
+        Random.constant Nothing
+
+    else
+        Random.Array.array setSizes.domain (Random.int 1 setSizes.codomain)
+            |> Random.map (Just << Function)
 
 
 eval : Function -> List ( Int, Int )
