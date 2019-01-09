@@ -56,6 +56,8 @@ toRelativeCounts { noInjNoSur, noInjYesSur, yesInjNoSur, yesInjYesSur } =
             }
 
 
+{-| Represents function from {1..setSizes.domain} to {1..setSizes.codomain}
+-}
 type Function
     = Function (Array Int)
 
@@ -66,18 +68,18 @@ type Function
 
 randomFunctionGen : SetSizes -> Generator Function
 randomFunctionGen setSizes =
-    Random.Array.array setSizes.domain (Random.int 0 setSizes.codomain)
+    Random.Array.array setSizes.domain (Random.int 1 setSizes.codomain)
         |> Random.map Function
 
 
 eval : Function -> List ( Int, Int )
 eval (Function f) =
-    Array.toIndexedList f
+    List.map (Tuple.mapFirst (\x -> x + 1)) <| Array.toIndexedList f
 
 
 identityFunction : Int -> Function
 identityFunction n =
-    Function (Array.repeat n 0)
+    Function (Array.initialize n (\x -> x + 1))
 
 
 lookupCounts : SetSizes -> FunctionCounts

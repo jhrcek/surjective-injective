@@ -11,8 +11,8 @@ import FormatNumber.Locales exposing (Locale)
 import Function exposing (Function, FunctionCountsRelative, SetSizes, eval, randomFunctionGen)
 import Html exposing (Html)
 import Random
-import Svg exposing (Svg, circle, g, path, rect, svg)
-import Svg.Attributes exposing (cx, cy, d, fill, fillOpacity, height, r, rx, ry, stroke, strokeWidth, transform, width, x, y)
+import Svg exposing (Svg, circle, g, line, path, rect, svg)
+import Svg.Attributes exposing (cx, cy, d, fill, fillOpacity, height, r, rx, ry, stroke, strokeWidth, transform, width, x, x1, x2, y, y1, y2)
 
 
 main : Program () Model Msg
@@ -58,23 +58,25 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         ChangeDomain domain ->
-            ( { model
-                | setSizes =
+            let
+                newSetSize =
                     { domain = domain
                     , codomain = model.setSizes.codomain
                     }
-              }
-            , Cmd.none
+            in
+            ( { model | setSizes = newSetSize }
+            , generateRandomFunction model.setSizes
             )
 
         ChangeCodomain codomain ->
-            ( { model
-                | setSizes =
+            let
+                newSetSizes =
                     { domain = model.setSizes.domain
                     , codomain = codomain
                     }
-              }
-            , Cmd.none
+            in
+            ( { model | setSizes = newSetSizes }
+            , generateRandomFunction newSetSizes
             )
 
         ChangePercentPrecision percentPrecision ->
@@ -83,20 +85,22 @@ update msg model =
             )
 
         ChangeDomainAndCodomain setSizes ->
-            ( { model | setSizes = setSizes }, Cmd.none )
+            ( { model | setSizes = setSizes }
+            , generateRandomFunction setSizes
+            )
 
         GenerateRandomFunction ->
             ( model
-            , Random.generate ReceivedRandomFunction
-                (randomFunctionGen model.setSizes)
+            , generateRandomFunction model.setSizes
             )
 
         ReceivedRandomFunction randomFunction ->
-            let
-                _ =
-                    Debug.log "random fun" model.randomFunction
-            in
             ( { model | randomFunction = randomFunction }, Cmd.none )
+
+
+generateRandomFunction : SetSizes -> Cmd Msg
+generateRandomFunction setSizes =
+    Random.generate ReceivedRandomFunction (randomFunctionGen setSizes)
 
 
 view : Model -> Html Msg
@@ -111,7 +115,7 @@ view model =
                 , Element.column [ Element.alignTop ]
                     [ infoTable model.setSizes model.percentPrecision
                     , slider 5 75 "Percent precision" ChangePercentPrecision model.percentPrecision
-                    , functionDiagram model.setSizes
+                    , functionDiagram model.setSizes model.randomFunction
                     , randomFunctionGeneratorControls
                     ]
                 ]
@@ -126,24 +130,30 @@ randomFunctionGeneratorControls =
         }
 
 
-functionDiagram : SetSizes -> Element msg
-functionDiagram setSizes =
+functionDiagram : SetSizes -> Function -> Element msg
+functionDiagram setSizes f =
     let
         setView setSize =
             rect [ x "1", y "1", width "60", height (String.fromInt <| 45 * max 1 setSize + 15), rx "30", ry "30", stroke "black", fill "none", strokeWidth "2" ] []
                 :: (List.range 1 setSize
-                        |> List.map (\i -> circle [ cx "30", cy (String.fromInt <| 45 * i - 15), r "15", fill "none", stroke "black", strokeWidth "2" ] [])
+                        |> List.map (\i -> circle [ cx "30", cy (circleYCoord i), r "15", fill "white", stroke "black", strokeWidth "2" ] [])
                    )
+
+        circleYCoord idx =
+            String.fromInt <| 45 * idx - 15
 
         domainView =
             setView setSizes.domain
 
         codomainView =
             g [ transform "translate(300,0)" ] <| setView setSizes.codomain
+
+        mappingLines =
+            g [] <| List.map (\( x, y ) -> line [ x1 "30", x2 "330", y1 (circleYCoord x), y2 (circleYCoord y), stroke "black", strokeWidth "2" ] []) <| Function.eval f
     in
     Element.html <|
         svg [ width "500", height "500" ]
-            (codomainView :: domainView)
+            (mappingLines :: codomainView :: domainView)
 
 
 proportionsTable : SetSizes -> Element Msg
@@ -385,21 +395,14 @@ proportionsToTableMapping relCounts =
         [ width <| String.fromInt mappingImageWidth
         , height <| String.fromFloat svgHeight
         ]
-        [ -- Green = bijective
-          rect [ x "0", y "0", height (String.fromFloat greenHeight), fill "lime", width "48" ] []
-        , path [ d <| "M 50 0  L 150 30  v 30 L 50 " ++ String.fromFloat greenEnd ++ "Z", fill "lime", fillOpacity "0.5" ] []
-
-        -- Blue = injective, not surjective
-        , rect [ x "0", y (String.fromFloat greenEnd), height (String.fromFloat blueHeight), fill "blue", width "48" ] []
-        , path [ d <| "M 50 " ++ String.fromFloat greenEnd ++ "  L 150 60  v 30 L 50 " ++ String.fromFloat blueEnd ++ "Z", fill "blue", fillOpacity "0.5" ] []
-
-        -- Red = surjective, not injective
-        , rect [ x "0", y (String.fromFloat blueEnd), height (String.fromFloat redHeight), fill "red", width "48" ] []
+        [ rect [ width "50", height (String.fromFloat greenHeight), x "0", y "0", fill "lime" ] []
+        , rect [ width "50", height (String.fromFloat blueHeight), x "0", y (String.fromFloat greenEnd), fill "blue" ] []
+        , rect [ width "50", height (String.fromFloat redHeight), x "0", y (String.fromFloat blueEnd), fill "red" ] []
+        , rect [ width "50", height (String.fromFloat grayHeight), x "0", y (String.fromFloat redEnd), fill "gray" ] []
+        , path [ d <| "M 50 0                                   L 150 30  v 30 L 50 " ++ String.fromFloat greenEnd ++ "Z", fill "lime", fillOpacity "0.5" ] []
+        , path [ d <| "M 50 " ++ String.fromFloat greenEnd ++ " L 150 60  v 30 L 50 " ++ String.fromFloat blueEnd ++ "Z", fill "blue", fillOpacity "0.5" ] []
         , path [ d <| "M 50 " ++ String.fromFloat blueEnd ++ "  L 150 90  v 30 L 50 " ++ String.fromFloat redEnd ++ "Z", fill "red", fillOpacity "0.5" ] []
-
-        -- Gray = Not surjective, not injective
-        , rect [ x "0", y (String.fromFloat redEnd), height (String.fromFloat grayHeight), fill "gray", width "48" ] []
-        , path [ d <| "M 50 " ++ String.fromFloat redEnd ++ "  L 150 120  v 30 L 50 " ++ String.fromFloat grayEnd ++ "Z", fill "grey", fillOpacity "0.5" ] []
+        , path [ d <| "M 50 " ++ String.fromFloat redEnd ++ "   L 150 120 v 30 L 50 " ++ String.fromFloat grayEnd ++ "Z", fill "grey", fillOpacity "0.5" ] []
         ]
 
 
