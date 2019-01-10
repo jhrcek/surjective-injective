@@ -6,8 +6,6 @@ Live [demo](https://janhrcek.cz/surjective-injective).
 
 ## TODO
 
--   function diagram
-    -   Add A, B as set labels
 -   controls for generating random functions
     -   generate any function
     -   surjective, injective (only enabled when such a function exists for given domain/codomain size)

@@ -140,7 +140,7 @@ maybeFunctionDiagram setSizes maybeFunction =
     case maybeFunction of
         Just function ->
             Element.column []
-                [ Element.text "Example"
+                [ Element.text "Example function"
                 , functionDiagram setSizes function
                 ]
 
@@ -154,7 +154,7 @@ maybeFunctionDiagram setSizes maybeFunction =
 functionDiagram : SetSizes -> Function -> Element msg
 functionDiagram setSizes f =
     let
-        setView setSize =
+        setView setSize setName =
             rect [ x "1", y "1", width "60", height (String.fromInt <| 45 * max 1 setSize + 15), rx "30", ry "30", stroke "black", fill "none", strokeWidth "2" ] []
                 :: (List.range 1 setSize
                         |> List.map
@@ -165,22 +165,27 @@ functionDiagram setSizes f =
                                     ]
                             )
                    )
+                ++ [ text_ [ x "30", y (String.fromInt <| 45 * max 1 setSize + 45), textAnchor "middle", SA.style "font-size:30" ] [ text setName ] ]
 
         circleYCoord idx =
             String.fromInt <| 45 * idx - 15
 
         domainView =
-            setView setSizes.domain
+            g [] <| setView setSizes.domain "A"
 
         codomainView =
-            g [ transform "translate(300,0)" ] <| setView setSizes.codomain
+            g [ transform "translate(300,0)" ] <| setView setSizes.codomain "B"
 
         mappingLines =
             g [] <| List.map (\( x, y ) -> line [ x1 "30", x2 "330", y1 (circleYCoord x), y2 (circleYCoord y), stroke "black", strokeWidth "2", markerEnd "url(#arrow)" ] []) <| Function.eval f
     in
     Element.html <|
-        svg [ width "400", height "485" ]
-            (arrowHeadMarkerDef :: mappingLines :: codomainView :: domainView)
+        svg [ width "400", height "500" ]
+            [ arrowHeadMarkerDef
+            , mappingLines
+            , codomainView
+            , domainView
+            ]
 
 
 {-| Arrowhead to be reused by all mapping arrows, inspired by <http://vanseodesign.com/web-design/svg-markers/>
@@ -232,36 +237,26 @@ previewCell setSizes isCellSelected =
             else
                 0.5
 
+        portionRectangle : (Float -> Element.Color) -> Int -> Element msg
+        portionRectangle mkColor number =
+            Element.el
+                [ Background.color (mkColor alpha)
+                , Element.height (Element.fillPortion number)
+                , Element.width Element.fill
+                ]
+                Element.none
+
+        cellContents : List (Element msg)
         cellContents =
             case Function.toRelativeCounts fcounts of
                 Nothing ->
                     [ Element.el [ Element.centerX, Element.centerY ] (Element.text "None") ]
 
                 Just _ ->
-                    [ Element.el
-                        [ Background.color (rgba 1 0 0 alpha)
-                        , Element.height (Element.fillPortion fcounts.noInjYesSur)
-                        , Element.width Element.fill
-                        ]
-                        Element.none
-                    , Element.el
-                        [ Background.color (rgba 0 1 0 alpha)
-                        , Element.height (Element.fillPortion fcounts.yesInjYesSur)
-                        , Element.width Element.fill
-                        ]
-                        Element.none
-                    , Element.el
-                        [ Background.color (rgba 0 0 1 alpha)
-                        , Element.height (Element.fillPortion fcounts.yesInjNoSur)
-                        , Element.width Element.fill
-                        ]
-                        Element.none
-                    , Element.el
-                        [ Background.color (rgba 0.5 0.5 0.5 alpha)
-                        , Element.height (Element.fillPortion fcounts.noInjNoSur)
-                        , Element.width Element.fill
-                        ]
-                        Element.none
+                    [ portionRectangle (rgba 1 0 0) fcounts.noInjYesSur
+                    , portionRectangle (rgba 0 1 0) fcounts.yesInjYesSur
+                    , portionRectangle (rgba 0 0 1) fcounts.yesInjNoSur
+                    , portionRectangle (rgba 0.5 0.5 0.5) fcounts.noInjNoSur
                     ]
     in
     Element.column
