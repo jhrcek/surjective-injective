@@ -8,6 +8,7 @@ module Function exposing
     , lookupCounts
     , randomFunctionGen
     , randomInjectiveFunctionGen
+    , randomSurjectiveFunctionGen
     , toRelativeCounts
     )
 
@@ -77,7 +78,7 @@ randomFunctionGen { domain, codomain } =
 
 
 {-| Generate function guaranteed to be injective.
-Generates Nothing <-> |domain| > |codomain|
+Generates Nothing iff |domain| > |codomain|
 -}
 randomInjectiveFunctionGen : SetSizes -> Generator (Maybe Function)
 randomInjectiveFunctionGen { domain, codomain } =
@@ -88,6 +89,21 @@ randomInjectiveFunctionGen { domain, codomain } =
         List.range 1 codomain
             |> Random.List.shuffle
             |> Random.map (Just << Function << Array.fromList << List.take domain)
+
+
+{-| Generated function guaraneed to be surjective.
+Generates Nothing iff |domain| < |codomain|
+-}
+randomSurjectiveFunctionGen : SetSizes -> Generator (Maybe Function)
+randomSurjectiveFunctionGen { domain, codomain } =
+    if domain < codomain then
+        Random.constant Nothing
+
+    else
+        Random.list (domain - codomain) (Random.int 1 codomain)
+            |> Random.map (\rest -> List.range 1 codomain ++ rest)
+            |> Random.andThen Random.List.shuffle
+            |> Random.map (Just << Function << Array.fromList)
 
 
 eval : Function -> List ( Int, Int )
