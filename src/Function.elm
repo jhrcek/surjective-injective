@@ -7,6 +7,7 @@ module Function exposing
     , identityFunction
     , lookupCounts
     , randomFunctionGen
+    , randomInjectiveFunctionGen
     , toRelativeCounts
     )
 
@@ -14,6 +15,7 @@ import Array exposing (Array)
 import Dict exposing (Dict)
 import Random exposing (Generator)
 import Random.Array
+import Random.List
 
 
 type alias SetSizes =
@@ -62,14 +64,30 @@ type Function
     = Function (Array Int)
 
 
+{-| Generate any function (no properties guaranteed)
+-}
 randomFunctionGen : SetSizes -> Generator (Maybe Function)
-randomFunctionGen setSizes =
-    if setSizes.domain /= 0 && setSizes.codomain == 0 then
+randomFunctionGen { domain, codomain } =
+    if domain /= 0 && codomain == 0 then
         Random.constant Nothing
 
     else
-        Random.Array.array setSizes.domain (Random.int 1 setSizes.codomain)
+        Random.Array.array domain (Random.int 1 codomain)
             |> Random.map (Just << Function)
+
+
+{-| Generate function guaranteed to be injective.
+Generates Nothing <-> |domain| > |codomain|
+-}
+randomInjectiveFunctionGen : SetSizes -> Generator (Maybe Function)
+randomInjectiveFunctionGen { domain, codomain } =
+    if domain > codomain then
+        Random.constant Nothing
+
+    else
+        List.range 1 codomain
+            |> Random.List.shuffle
+            |> Random.map (Just << Function << Array.fromList << List.take domain)
 
 
 eval : Function -> List ( Int, Int )
