@@ -12,7 +12,7 @@ import Function exposing (Function, FunctionCountsRelative, SetSizes, eval, rand
 import Html exposing (Html)
 import Random
 import Svg exposing (Svg, circle, g, line, path, rect, svg, text, text_)
-import Svg.Attributes as SA exposing (alignmentBaseline, cx, cy, d, fill, fillOpacity, height, markerEnd, markerHeight, markerUnits, markerWidth, orient, r, refX, refY, rx, ry, stroke, strokeWidth, textAnchor, transform, width, x, x1, x2, y, y1, y2)
+import Svg.Attributes as SA exposing (cx, cy, d, dominantBaseline, fill, fillOpacity, height, markerEnd, markerHeight, markerUnits, markerWidth, orient, r, refX, refY, rx, ry, stroke, strokeWidth, textAnchor, transform, width, x, x1, x2, y, y1, y2)
 
 
 main : Program () Model Msg
@@ -161,7 +161,7 @@ functionDiagram setSizes f =
                             (\i ->
                                 g []
                                     [ circle [ cx "30", cy (circleYCoord i), r "15", fill "white", stroke "black", strokeWidth "2" ] []
-                                    , text_ [ x "30", y (circleYCoord i), textAnchor "middle", alignmentBaseline "middle" ] [ text <| String.fromInt i ]
+                                    , text_ [ x "30", y (circleYCoord i), textAnchor "middle", dominantBaseline "central" ] [ text <| String.fromInt i ]
                                     ]
                             )
                    )
